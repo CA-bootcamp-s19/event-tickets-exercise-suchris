@@ -114,11 +114,15 @@ contract('EventTicketV2', function(accounts) {
         })
 
         describe("getRefund()", async() =>{
-            it("only accounts that have purchased tickets should be able to get a refund", async() => {
+            it.only("only accounts that have purchased tickets should be able to get a refund", async() => {
                 const numTickets = 1
+                const value = ticketPrice * numTickets
+                console.log('value is:', value)
                 
-                await instance.addEvent(event1.description, event1.website, event1.ticketsAvailable, {from: deployAccount} )
-                await instance.buyTickets(0, numTickets, {from: firstAccount, value: ticketPrice * numTickets}) 
+                const eventId = await instance.addEvent.call(event1.description, event1.website, event1.ticketsAvailable, {from: deployAccount} )
+                console.log('eventId', eventId, eventId.toNumber())
+                // await instance.buyTickets(0, numTickets, {from: firstAccount, value: ticketPrice * numTickets}) 
+                await instance.buyTickets.call(eventId.toNumber(), numTickets, {from: firstAccount, value}) 
 
                 await catchRevert(instance.getRefund(0, {from: secondAccount}))
                 const tx = await instance.getRefund(0, {from: firstAccount})

@@ -6,6 +6,7 @@ async function tryCatch(promise, reason) {
         throw null;
     }
     catch (error) {
+        console.log(error)
         assert(error, "Expected a VM exception but did not get one");
         assert(error.message.search(errorString + reason) >= 0, "Expected an error containing '" + errorString + reason + "' but got '" + error.message + "' instead");
     }
