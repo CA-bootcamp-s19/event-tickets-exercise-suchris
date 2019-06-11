@@ -22,14 +22,13 @@ contract EventTickets {
         Choose the appropriate variable type for each field.
         The "buyers" field should keep track of addresses and how many tickets each buyer purchases.
     */
-
     struct Event {
-        string description;
-        string website;
-        uint totalTickets;
-        uint sales;
-        mapping (address => uint) buyers;
-        bool isOpen;
+        string description;         // event description
+        string website;             // event website
+        uint totalTickets;          // total number of tickets available to purchase
+        uint sales;                 // total number of tickets sold
+        mapping (address => uint) buyers;       // mapping of buyers and their ticket purchase
+        bool isOpen;                // is the event opened for sale
     }
 
     Event myEvent;
@@ -45,9 +44,7 @@ contract EventTickets {
     event LogGetRefund (address purchaser, uint numTickets);
     event LogEndSale (address owner, uint balance);
 
-    /*
-        Create a modifier that throws an error if the msg.sender is not the owner.
-    */
+    /// @notice is owner of the event
     modifier isOwner() {
         require (
             msg.sender == address(owner),
@@ -56,6 +53,7 @@ contract EventTickets {
         _;
     }
 
+    /// @notice is the event opened
     modifier isEventOpen() {
         require (
             myEvent.isOpen == true,
@@ -64,7 +62,8 @@ contract EventTickets {
         _;
     }
 
-    modifier isEnoughFunds(uint numTickets) {
+    /// @notice does buyer send enough funds to buy tickets
+    modifier hasEnoughFunds(uint numTickets) {
         require (
             msg.value >= numTickets * TICKET_PRICE,
             "Not enough was paid"
@@ -72,7 +71,8 @@ contract EventTickets {
         _;
     }
 
-    modifier isEnoughTickets(uint numTickets) {
+    /// @notice does event have enough ticket to sell to buyer
+    modifier hasEnoughTickets(uint numTickets) {
         require (
             myEvent.totalTickets >= numTickets,
             "Not enough tickets to sell"
@@ -80,16 +80,18 @@ contract EventTickets {
         _;
     }
 
+    /// @notice refund excess payment to buyer
     modifier refundExcessPayment(uint numTickets) {
         _;
         uint amountToRefund = msg.value - (TICKET_PRICE * numTickets);
         (msg.sender).transfer(amountToRefund);
     }
 
-    modifier isTicketRefundable(uint numTickets) {
+    /// @notice does buyer have tickets to be refunded
+    modifier hasTicketsToRefund() {
         require (
-            getBuyerTicketCount(msg.sender) >= numTickets,
-            "Can't refund more than the number of tickets bought"
+            getBuyerTicketCount(msg.sender) > 0,
+            "Buyer didn't buy any tickets"
         );
         _;
     }
@@ -100,7 +102,6 @@ contract EventTickets {
         Set the owner to the creator of the contract.
         Set the appropriate myEvent details.
     */
-    
     constructor(string memory _description, string memory _website, uint _totalTickets)
         public
     {
@@ -159,8 +160,8 @@ contract EventTickets {
         public
         payable
         isEventOpen()
-        isEnoughFunds(numTickets)
-        isEnoughTickets(numTickets)
+        hasEnoughFunds(numTickets)
+        hasEnoughTickets(numTickets)
         refundExcessPayment(numTickets)
     {
         myEvent.buyers[msg.sender] += numTickets;
@@ -179,18 +180,19 @@ contract EventTickets {
             - Transfer the appropriate amount to the refund requester.
             - Emit the appropriate event.
     */
-    function getRefund(uint numTickets)
+    function getRefund()
         public
         payable
         isEventOpen()
-        isTicketRefundable(numTickets)
+        hasTicketsToRefund()
     {
+        uint numTickets = getBuyerTicketCount(msg.sender);
         myEvent.buyers[msg.sender] -= numTickets;
         myEvent.totalTickets += numTickets;
         myEvent.sales -= numTickets;
 
         uint refundAmount = numTickets * TICKET_PRICE;
-        msg.sender.transfer(refundAmount);
+        (msg.sender).transfer(refundAmount);
 
         emit LogGetRefund(msg.sender, numTickets);
     }

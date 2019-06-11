@@ -42,8 +42,8 @@ contract EventTicketsV2 {
     constructor() public {
         owner = msg.sender;
         idGenerator = 0;
-
     }
+
     event LogEventAdded(string desc, string url, uint ticketsAvailable, uint eventId);
     event LogBuyTickets(address buyer, uint eventId, uint numTickets);
     event LogGetRefund(address accountRefunded, uint eventId, uint numTickets);
@@ -52,6 +52,8 @@ contract EventTicketsV2 {
     /*
         Create a modifier that throws an error if the msg.sender is not the owner.
     */
+
+    /// @notice is owner of the contract
     modifier isOwner() {
         require (
             msg.sender == owner,
@@ -60,6 +62,7 @@ contract EventTicketsV2 {
         _;
     }
 
+    /// @notice is event opened
     modifier isEventOpen(uint id) {
         require (
             events[id].isOpen,
@@ -68,7 +71,8 @@ contract EventTicketsV2 {
         _;
     }
 
-    modifier isEnoughFunds(uint numTickets) {
+    /// @notice buyer has enough funds to purchase ticket
+    modifier hasEnoughFunds(uint numTickets) {
         require (
             msg.value >= numTickets * TICKET_PRICE,
             "Not enough was paid"
@@ -76,7 +80,8 @@ contract EventTicketsV2 {
         _;
     }
 
-    modifier isEnoughTickets(uint id, uint numTickets) {
+    /// @notice event has enought tickets to be sold
+    modifier hasEnoughTickets(uint id, uint numTickets) {
         require (
             events[id].totalTickets >= numTickets,
             "Not enough tickets to sell"
@@ -84,16 +89,18 @@ contract EventTicketsV2 {
         _;
     }
 
+    /// @notice refund excess payment by buyer
     modifier refundExcessPayment(uint numTickets) {
         _;
         uint amountToRefund = msg.value - TICKET_PRICE * numTickets;
         (msg.sender).transfer(amountToRefund);
     }
 
-    modifier isTicketRefundable(uint id, uint numTickets) {
+    /// @notice buyer owns tickets to be refunded
+    modifier hasTicketsToRefund(uint id) {
         require (
-            getBuyerNumberTickets(id) >= numTickets,
-            "Can't refund more than the number of tickets bought"
+            getBuyerNumberTickets(id) > 0,
+            "Buyer didn't buy any tickets"
         );
         _;
     }
@@ -116,15 +123,13 @@ contract EventTicketsV2 {
         isOwner()
         returns (uint)
     {
-        Event memory myEvent;
-        myEvent.description = _description;
-        myEvent.website = _website;
-        myEvent.totalTickets = _totalTickets;
-        myEvent.sales = 0;
-        myEvent.isOpen = true;
+        events[idGenerator].description = _description;
+        events[idGenerator].website = _website;
+        events[idGenerator].totalTickets = _totalTickets;
+        events[idGenerator].sales = 0;
+        events[idGenerator].isOpen = true;
 
-        events[idGenerator] = myEvent;
-        emit LogEventAdded(myEvent.description,myEvent.website, myEvent.totalTickets, idGenerator);
+        emit LogEventAdded(_description,_website, _totalTickets, idGenerator);
         return idGenerator++;
     }
 
@@ -167,8 +172,8 @@ contract EventTicketsV2 {
         public
         payable
         isEventOpen(id)
-        isEnoughFunds(numTickets)
-        isEnoughTickets(id, numTickets)
+        hasEnoughFunds(numTickets)
+        hasEnoughTickets(id, numTickets)
         refundExcessPayment(numTickets)
     {
         events[id].buyers[msg.sender] += numTickets;
@@ -188,18 +193,19 @@ contract EventTicketsV2 {
             - send appropriate value to the refund requester
             - emit the appropriate event
     */
-    function getRefund(uint id, uint numTickets)
+    function getRefund(uint id)
         public
         payable
         isEventOpen(id)
-        isTicketRefundable(id, numTickets)
+        hasTicketsToRefund(id)
     {
+        uint numTickets = getBuyerNumberTickets(id);
         events[id].buyers[msg.sender] -= numTickets;
         events[id].totalTickets += numTickets;
         events[id].sales -= numTickets;
 
         uint refundAmount = numTickets * TICKET_PRICE;
-        msg.sender.transfer(refundAmount);
+        (msg.sender).transfer(refundAmount);
 
         emit LogGetRefund(msg.sender, id, numTickets);
     }
